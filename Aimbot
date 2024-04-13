@@ -1,0 +1,112 @@
+-- Function to find the nearest enemy within a certain range
+local function findNearestEnemy()
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+
+    if not character then
+        return nil
+    end
+
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    local maxDistance = 500 -- Adjust as needed
+
+    local closestEnemy = nil
+    local closestDistance = maxDistance
+
+    for _, enemy in ipairs(game.Players:GetPlayers()) do
+        if enemy ~= player then
+            local enemyCharacter = enemy.Character
+            if enemyCharacter then
+                local enemyRootPart = enemyCharacter:FindFirstChild("HumanoidRootPart")
+                if enemyRootPart then
+                    local distance = (enemyRootPart.Position - humanoidRootPart.Position).Magnitude
+                    if distance < closestDistance then
+                        closestEnemy = enemyRootPart
+                        closestDistance = distance
+                    end
+                end
+            end
+        end
+    end
+
+    return closestEnemy
+end
+
+local aimingEnabled = false
+
+-- Function to continuously track and aim at the nearest enemy
+local function aimAtEnemy()
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+
+    while aimingEnabled do
+        wait(0.1) -- Adjust the interval for smoother tracking
+
+        local enemyRootPart = findNearestEnemy()
+        if enemyRootPart then
+            -- Calculate aiming direction towards the enemy
+            local aimingDirection = (enemyRootPart.Position - character.HumanoidRootPart.Position).unit
+
+            -- Rotate character to aim at the enemy
+            local lookAt = CFrame.new(character.HumanoidRootPart.Position, enemyRootPart.Position)
+            character:SetPrimaryPartCFrame(lookAt)
+        end
+    end
+end
+
+-- Toggle aiming state
+local function toggleAimbot()
+    aimingEnabled = not aimingEnabled
+    if aimingEnabled then
+        aimAtEnemy()
+    end
+end
+
+-- Create a simple GUI button
+local gui = Instance.new("ScreenGui")
+gui.Parent = game.Players.LocalPlayer.PlayerGui
+
+local button = Instance.new("TextButton")
+button.Text = "Toggle Aimbot"
+button.Size = UDim2.new(0, 120, 0, 50)
+button.Position = UDim2.new(0.5, -60, 0.9, -25)
+button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Parent = gui
+
+-- Enable dragging for the GUI
+local isDragging = false
+local dragStartOffset = nil
+
+button.MouseButton1Down:Connect(function()
+    isDragging = true
+    dragStartOffset = button.Position - UDim2.new(0, game:GetService("GuiService"):GetGuiInset().X, 0, game:GetService("GuiService"):GetGuiInset().Y) - UDim2.new(0, game.Players.LocalPlayer.PlayerGui.AbsolutePosition.X, 0, game.Players.LocalPlayer.PlayerGui.AbsolutePosition.Y)
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local newPosition = UDim2.new(0, input.Position.X, 0, input.Position.Y) - dragStartOffset
+        button.Position = newPosition
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = false
+    end
+end)
+
+-- Connect button click event to toggle aimbot
+button.MouseButton1Click:Connect(toggleAimbot)
+
+-- Start aiming at the nearest enemy when the character is spawned
+game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
+    if aimingEnabled then
+        aimAtEnemy()
+    end
+end)
+
+-- Call `aimAtEnemy()` if the character is already in the game and aiming is enabled
+if game.Players.LocalPlayer.Character and aimingEnabled then
+    aimAtEnemy()
+end
